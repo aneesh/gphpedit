@@ -34,8 +34,6 @@
 
 #define IS_MIME(stringa,stringb) (g_content_type_equals (stringa, stringb))
 #define IS_TEXT(stringa) (g_content_type_is_a (stringa, "text/*"))
-#define IS_APPLICATION(stringa) (g_content_type_is_a (stringa, "application/*") && !IS_MIME(stringa,"application/x-php") && !IS_MIME(stringa,"application/javascript") && !IS_MIME(stringa,"application/x-perl"))
-
 
 /*
 * document_loader private struct
@@ -312,7 +310,7 @@ static gboolean _document_loader_validate_and_convert_utf8_buffer (gchar **buffe
         return FALSE;
       }
     }
-    gphpedit_debug_message (DEBUG_DOCUMENT,_("Converted to UTF-8 size: %u"), utf8_size);
+    gphpedit_debug_message (DEBUG_DOCUMENT,_("Converted to UTF-8 size: %" G_GSSIZE_FORMAT), utf8_size);
     g_free(*buffer);
     *buffer = converted_text;
     result = TRUE;
@@ -376,12 +374,17 @@ static gboolean _document_loader_prompt_create_file(const gchar *filename)
   if (!filename) return TRUE;
   gint result;
   gchar *message = g_strdup_printf(_("The file %s was not found.\n\nWould you like to create it as an empty document?"), filename);
-  result = yes_no_dialog(_("File not found"), message);
+  result = yes_no_dialog(NULL, _("File not found"), message);
   g_free(message);
   if (result != GTK_RESPONSE_YES){
     return FALSE;
   }
   return TRUE;
+}
+
+static gboolean is_mime_allowed(const gchar *mime){
+    return IS_TEXT(mime) || IS_MIME(mime,"application/x-php") ||
+        IS_MIME(mime,"application/javascript") || IS_MIME(mime,"application/x-perl");
 }
 
 static gboolean _document_loader_check_supported_type(GFile *file)
@@ -398,8 +401,8 @@ static gboolean _document_loader_check_supported_type(GFile *file)
   }
   const char *contenttype= g_file_info_get_content_type (info); 
   /*we could open text based types so if it not a text based content don't open and displays error*/
-  if (!IS_TEXT(contenttype) && IS_APPLICATION(contenttype)){
-    info_dialog (_("gPHPEdit"), _("Sorry, I can open this kind of file.\n"));
+  if (!is_mime_allowed(contenttype)){
+    info_dialog (NULL, _("gPHPEdit"), _("Sorry, I can open this kind of file.\n"));
     result = FALSE;
   }
   g_object_unref(info);
@@ -471,7 +474,7 @@ static void _document_loader_load_file_finish (GObject *source_object, GAsyncRes
     emit_signal (doclod, FALSE, NULL);
     return ;
   }
-  gphpedit_debug_message (DEBUG_DOCUMENT,"Loaded %u bytes", size);
+  gphpedit_debug_message (DEBUG_DOCUMENT,"Loaded %" G_GSSIZE_FORMAT "bytes", size);
   gphpedit_debug_message (DEBUG_DOCUMENT,"BUFFER=\n%s\n-------------------------------------------", buffer);
 
   if (size) converted_to_utf8 = _document_loader_validate_and_convert_utf8_buffer(&buffer);

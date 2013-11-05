@@ -34,7 +34,7 @@
 #define MIME_ISDIR(string) (g_strcmp0(string, "inode/directory")==0)
 #define IS_MIME(stringa,stringb) (g_content_type_equals (stringa, stringb))
 #define IS_TEXT(stringa) (g_content_type_is_a (stringa, "text/*"))
-#define IS_APPLICATION(stringa) (g_content_type_is_a (stringa, "application/*") && !IS_MIME(stringa,"application/x-php") && !IS_MIME(stringa,"application/javascript") && !IS_MIME(stringa,"application/x-perl"))
+#define IS_ALLOWED_MIME(stringa) (IS_TEXT(stringa) || IS_MIME(stringa,"application/x-php") || IS_MIME(stringa,"application/javascript") || IS_MIME(stringa,"application/x-perl"))
 #define DEFAULT_DIR (N_("Workspace's directory"))
 #define IS_DEFAULT_DIR(a) (g_strcmp0(a,DEFAULT_DIR)==0)
 #define FOLDER_INFOFLAGS "standard::is-backup,standard::display-name,standard::icon,standard::content-type"
@@ -132,6 +132,10 @@ static inline void filebrowser_backend_restore(FilebrowserBackend *filebackend){
   g_signal_emit (G_OBJECT (filebackend), signals[DONE_LOADING], 0); /* needed to update ui */
 }
 
+static gboolean is_mime_allowed(const gchar *mime){
+    return IS_TEXT(mime) || IS_MIME(mime,"application/x-php") ||
+        IS_MIME(mime,"application/javascript") || IS_MIME(mime,"application/x-perl");
+}
 static void
 filebrowser_backend_finalize (GObject *object)
 {
@@ -208,9 +212,7 @@ gboolean populate_files (gpointer data)     //TODO:: show an spinner while loadi
 {
   FilebrowserBackend *filebackend= FILEBROWSER_BACKEND(data);
   FilebrowserBackendDetails *directory = FILEBROWSER_BACKEND_GET_PRIVATE(filebackend);
-  GDK_THREADS_ENTER();
   if (g_cancellable_is_cancelled (directory->cancellable)){
-  GDK_THREADS_LEAVE();
   return FALSE; /* remove source */
   }
   GError *error=NULL;
@@ -232,7 +234,7 @@ gboolean populate_files (gpointer data)     //TODO:: show an spinner while loadi
 		 directory->filesinfolder = g_slist_append(directory->filesinfolder, current);
 		  }
 	  } else {
-	    if (IS_TEXT(mime) && !IS_APPLICATION(mime)){
+	    if (is_mime_allowed(mime)){
 	      //files
 	      FOLDERFILE *current;
 	      current=new_folderfile();
@@ -332,26 +334,18 @@ void filebrowser_backend_go_folder_home (FilebrowserBackend *fbback, gchar *file
   filebrowser_backend_update_folder (fbback,folderpath);
   if (folderpath) g_free(folderpath);
 }
+
 void filebrowser_backend_refresh_folder (FilebrowserBackend *fbback){
   gphpedit_debug(DEBUG_FILEBROWSER);
   FilebrowserBackendDetails *directory = FILEBROWSER_BACKEND_GET_PRIVATE(fbback);
   filebrowser_backend_update_folder (fbback,directory->current_folder); /*update with new uri */
 }
 
-void filebrowser_backend_open_file (FilebrowserBackend *fbback, gchar *filename){
-  gphpedit_debug(DEBUG_FILEBROWSER);
-  DocumentManager *docmg = document_manager_new();
-  document_manager_switch_to_file_or_open(docmg,filename, 0);
-  g_object_unref(docmg);
-}
-
-void filebrowser_backend_delete_file(FilebrowserBackend *filebackend, gchar *filename){
-  if (!filebackend || !filename) return;
- gint button = yes_no_dialog (_("Question"), _("Are you sure you wish to delete this file?"));
-  if (button == GTK_RESPONSE_YES){
-	filename_delete_file(filename);
-	filebrowser_backend_refresh_folder (filebackend);
-  }
+void filebrowser_backend_delete_file(FilebrowserBackend *filebackend, gchar *filename)
+{
+    if (!filebackend || !filename) return;
+    filename_delete_file(filename);
+    filebrowser_backend_refresh_folder (filebackend);
 }
 
 void filebrowser_backend_create_dir(FilebrowserBackend *filebackend, gchar *filename, gchar *name, gboolean isdir){
@@ -439,7 +433,7 @@ void filebrowser_backend_cancel (FilebrowserBackend *fbback){
       GFileInfo *info =g_file_query_info (cf->curfile,"standard::display-name", G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,NULL,NULL);
       dispname = (gchar *)g_file_info_get_display_name (info);
       tmpstr = g_strdup_printf(_("%s cannot be copied, it already exists, overwrite?"),dispname);
-      retval = yes_no_dialog (_("Overwrite file?"), tmpstr);
+      retval = yes_no_dialog (NULL, _("Overwrite file?"), tmpstr);
       g_free(tmpstr);
       g_free(dispname);
       if (retval != -8) {

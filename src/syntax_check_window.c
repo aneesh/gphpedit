@@ -94,8 +94,10 @@ gtk_syntax_check_window_dispose (GObject *object)
 
 static void goto_line(gchar *text)
 {
-  Documentable *doc = document_manager_get_current_documentable(main_window.docmg);
+  DocumentManager *docmg = document_manager_new();
+  Documentable *doc = document_manager_get_current_documentable(docmg);
   if (doc) documentable_goto_line(doc, atoi(text));
+  g_object_unref(docmg);
 }
 
 static void lint_row_activated (GtkTreeSelection *selection, gpointer data)
@@ -118,6 +120,12 @@ static void lint_row_activated (GtkTreeSelection *selection, gpointer data)
   }
 }
 
+void _init_model(GtkSyntaxCheckWindowPrivate *priv)
+{
+  if (!priv->lint_store) priv->lint_store = gtk_list_store_new (1, G_TYPE_STRING); /* create a new one */
+  /*clear tree */
+  gtk_list_store_clear(priv->lint_store);
+}
 
 /* 
 * syntax_window:
@@ -130,7 +138,12 @@ static void lint_row_activated (GtkTreeSelection *selection, gpointer data)
 void syntax_window(GtkSyntaxCheckWindow *win, Documentable *document, gchar *data)
 {
   GtkSyntaxCheckWindowPrivate *priv = GTK_SYNTAX_CHECK_WINDOW_GET_PRIVATE(win);
-  if (!document && !OBJECT_IS_DOCUMENT_SCINTILLA(document)) return;
+  if (!document && !OBJECT_IS_DOCUMENT_SCINTILLA(document)){
+    _init_model(priv);
+    gtk_tree_view_set_model(GTK_TREE_VIEW(priv->lint_view), GTK_TREE_MODEL(priv->lint_store));
+    gtk_widget_show(GTK_WIDGET(win));
+    return;
+  }
   if (!data) return;
   gchar *copy;
   gchar *token;
@@ -140,9 +153,8 @@ void syntax_window(GtkSyntaxCheckWindow *win, Documentable *document, gchar *dat
   document_scintilla_clear_sintax_style(DOCUMENT_SCINTILLA(document));
   gtk_widget_show(GTK_WIDGET(win));
   GtkTreeIter iter;
-  if (!priv->lint_store) priv->lint_store = gtk_list_store_new (1, G_TYPE_STRING); /* create a new one */
   /*clear tree */
-  gtk_list_store_clear(priv->lint_store);
+  _init_model(priv);
   copy = data;
 
   document_scintilla_set_sintax_annotation(DOCUMENT_SCINTILLA(document));
@@ -191,7 +203,7 @@ gtk_syntax_check_window_new (void)
   return g_object_new (GTK_TYPE_SYNTAX_CHECK_WINDOW, NULL);
 }
 
-void gtk_syntax_check_window_run_check(GtkSyntaxCheckWindow *win, Documentable *document)
+void gtk_syntax_check_window_run_check(GtkSyntaxCheckWindow *win, Documentable *document, MainWindow *main_window)
 {
   g_return_if_fail(win);
   if (!document){
@@ -205,7 +217,8 @@ void gtk_syntax_check_window_run_check(GtkSyntaxCheckWindow *win, Documentable *
   } else {
       /* try plugins */
       PluginManager *plugmg = plugin_manager_new ();
-      if (!run_syntax_plugin_by_ftype(plugmg, document)){
+      if (!run_syntax_plugin_by_ftype(plugmg, document, main_window)){
+      syntax_window(win, document, g_strdup(_("syntax check not implement\n")));
       gphpedit_debug_message(DEBUG_SYNTAX, "syntax check not implement\n");
       }
     g_object_unref(plugmg);

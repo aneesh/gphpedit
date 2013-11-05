@@ -1,11 +1,12 @@
-/* This file is part of gPHPEdit, a GNOME2 PHP Editor.
- 
+/* This file is part of gPHPEdit, a GNOME PHP Editor.
+
    Copyright (C) 2003, 2004, 2005 Andy Jeffries <andy at gphpedit.org>
    Copyright (C) 2009 Anoop John <anoop dot john at zyxware.com>
-    
+   Copyright (C) 2009, 2010, 2011 José Rostagno (for vijona.com.ar) 
+
    For more information or to find the latest release, visit our 
    website at http://www.gphpedit.org/
- 
+
    gPHPEdit is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
@@ -13,14 +14,15 @@
 
    gPHPEdit is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with gPHPEdit.  If not, see <http://www.gnu.org/licenses/>.
- 
+   along with gPHPEdit. If not, see <http://www.gnu.org/licenses/>.
+
    The GNU General Public License is contained in the file COPYING.
 */
+
 
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
@@ -37,6 +39,7 @@
 
 typedef struct
 {
+  GtkBuilder *pbuilder;
   /* preferences manager */
   PreferencesManager *prefmg;
   TemplatesManager *tempmg;
@@ -46,15 +49,13 @@ typedef struct
   SymbolManager *symbolmg;
 
   GtkWidget *window;
-  GtkWidget *prinbox;
-  GtkWidget *prin_hbox;
   /* menu */
-  GtkWidget *menu;
+  GtkWidget *pmenu;
   /* toolbars */
   GtkWidget *toolbar_main;
 
-  GtkWidget *main_vertical_pane;
-  GtkWidget *main_horizontal_pane;
+  GtkWidget *pmain_vertical_pane;
+  GtkWidget *pmain_horizontal_pane;
   /* status bar */
   GtkWidget *appbar;
 
@@ -62,27 +63,37 @@ typedef struct
   
   GtkWidget *notebook_editor;
   /* syntax check widget */
-  GtkWidget *win;
+  GtkWidget *pwin;
 
   DocumentManager *docmg;
 
   //widget for close side bar button
-  GtkWidget *close_sidebar_button;
-  
-  GtkWidget *classbrowser;
+  GtkWidget *pclose_sidebar_button;
+  GtkWidget *pclassbrowser;
 
   /*filebrowser widget */
-  GtkWidget *folder;
+  GtkWidget *pfolder;
+
+  /*needed for menu hints*/
+  guint context_id;
+  guint message_id;
+  GHashTable *pmenu_hints;
+
+  gboolean is_app_closing;
 }
 MainWindow;
 
 extern MainWindow main_window;
 
-void main_window_create(void);
-void update_app_title(Documentable *document);
-void main_window_pass_command_line_files(char **argv);
-gboolean channel_pass_filename_callback(GIOChannel *source, GIOCondition condition, gpointer data );
-extern GIOChannel* inter_gphpedit_io;
-extern guint inter_gphpedit_event_id;
-extern guint idle_id;
+void main_window_create(char **argv, gint argc);
+void update_app_title(MainWindow *main_window, Documentable *document);
+void side_panel_show_hide(MainWindow *main_window);
+void statusbar_show_hide(MainWindow *main_window, gboolean state);
+void maintoolbar_show_hide(MainWindow *main_window, gboolean state);
+void fullscreen_show_hide(MainWindow *main_window, gboolean state);
+void syntax_check_show(MainWindow *main_window);
+void syntax_check_hide(MainWindow *main_window);
+void main_window_install_menu_hint(MainWindow *main_window, GtkWidget *widget, gchar *message);
+gboolean main_window_delete_event(GtkWidget *widget, GdkEvent *event, gpointer user_data);
+void quit_application(MainWindow *main_window);
 #endif

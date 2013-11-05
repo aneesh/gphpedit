@@ -26,12 +26,12 @@
 #include <glib/gi18n.h>
 #include <gdk/gdkkeysyms.h>
 
+#include "main_window.h"
 #include "classbrowser.h"
 #include "gvfs_utils.h"
 #include "symbol_manager.h"
 #include "preferences_manager.h"
 #include "document_manager.h"
-
 
 /* functions */
 static void gphpedit_classbrowser_class_init (gphpeditClassBrowserClass *klass);
@@ -39,11 +39,11 @@ static void gphpedit_classbrowser_init (gphpeditClassBrowser *button);
 
 struct _gphpeditClassBrowserPrivate
 {
+  MainWindow *main_window;
+
   GtkWidget *classbrowser;
   GtkBuilder *builder;
-  SymbolManager *symbolmg;
   PreferencesManager *prefmg;
-  DocumentManager *docmg;
 
   //Checkbox above treeview to parse only the current tab  
   GtkWidget *chkOnlyCurFileFuncs;
@@ -91,6 +91,7 @@ static gint treeview_double_click(GtkWidget *widget, GdkEventButton *event, gpoi
 static gint treeview_click_release(GtkWidget *widget, GdkEventButton *event, gpointer func_data);
 static void classbrowser_update_selected_label(gphpeditClassBrowserPrivate *priv, gchar *filename, gint line);
 static void doc_manager_change_document_cb (DocumentManager *docmg, Documentable *doc, gpointer user_data);
+static void gphpedit_classbrowser_constructed (GObject *object);
 
 #define CLASSBROWSER_BACKEND_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object),\
 					    GPHPEDIT_TYPE_CLASSBROWSER,\
@@ -99,15 +100,57 @@ static void doc_manager_change_document_cb (DocumentManager *docmg, Documentable
 /* http://library.gnome.org/devel/gobject/unstable/gobject-Type-Information.html#G-DEFINE-TYPE:CAPS */
 G_DEFINE_TYPE(gphpeditClassBrowser, gphpedit_classbrowser, GTK_TYPE_VBOX);
 
+enum
+{
+  PROP_0,
+  PROP_MAIN_WINDOW
+};
+
+static void
+gphpedit_classbrowser_set_property (GObject      *object,
+			      guint         prop_id,
+			      const GValue *value,
+			      GParamSpec   *pspec)
+{
+  gphpeditClassBrowserPrivate *priv = CLASSBROWSER_BACKEND_GET_PRIVATE(object);
+
+
+  switch (prop_id)
+  {
+    case PROP_MAIN_WINDOW:
+        priv->main_window = g_value_get_pointer(value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+static void
+gphpedit_classbrowser_get_property (GObject    *object,
+			      guint       prop_id,
+			      GValue     *value,
+			      GParamSpec *pspec)
+{
+  gphpeditClassBrowserPrivate *priv = CLASSBROWSER_BACKEND_GET_PRIVATE(object);
+  
+  switch (prop_id)
+  {
+    case PROP_MAIN_WINDOW:
+      g_value_set_pointer (value, priv->main_window);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+    }
+}
 
 static void gphpedit_classbrowser_dispose (GObject *object)
 {
   if(!object) return;
   gphpeditClassBrowserPrivate *priv;
   priv = CLASSBROWSER_BACKEND_GET_PRIVATE(object);
-  g_object_unref(priv->symbolmg);
   g_object_unref(priv->prefmg);
-//  g_object_unref(priv->docmg); //FIXME
 
   G_OBJECT_CLASS (gphpedit_classbrowser_parent_class)->dispose (object);
 }
@@ -117,6 +160,16 @@ gphpedit_classbrowser_class_init (gphpeditClassBrowserClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   object_class->dispose = gphpedit_classbrowser_dispose;
+  object_class->set_property = gphpedit_classbrowser_set_property;
+  object_class->get_property = gphpedit_classbrowser_get_property;
+  object_class->constructed = gphpedit_classbrowser_constructed;
+
+  g_object_class_install_property (object_class,
+                            PROP_MAIN_WINDOW,
+                            g_param_spec_pointer ("main_window",
+                            NULL, NULL,
+                            G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+
   g_type_class_add_private (object_class, sizeof(gphpeditClassBrowserPrivate));
 }
 
@@ -132,13 +185,6 @@ gphpedit_classbrowser_init (gphpeditClassBrowser *button)
   GtkTreeViewColumn *column;
 
   gphpeditClassBrowserPrivate *priv = CLASSBROWSER_BACKEND_GET_PRIVATE(button);
-
-  priv->symbolmg = symbol_manager_new (); 
-  g_signal_connect(priv->symbolmg, "update", G_CALLBACK(sdb_update_cb), priv);
-
-  priv->prefmg = preferences_manager_new ();
-  priv->docmg = document_manager_new ();
-  g_signal_connect (G_OBJECT (priv->docmg), "change_document", G_CALLBACK(doc_manager_change_document_cb), button);
 
   priv->current_type = -1;
 
@@ -192,14 +238,23 @@ gphpedit_classbrowser_init (gphpeditClassBrowser *button)
   gtk_tree_view_append_column (GTK_TREE_VIEW (priv->classtreeview), column);
 }
 
+static void gphpedit_classbrowser_constructed (GObject *object)
+{
+  gphpeditClassBrowserPrivate *priv = CLASSBROWSER_BACKEND_GET_PRIVATE(object);
+
+  g_signal_connect(priv->main_window->symbolmg, "update", G_CALLBACK(sdb_update_cb), priv);
+  priv->prefmg = priv->main_window->prefmg;
+  g_signal_connect (G_OBJECT (priv->main_window->docmg), "change_document", G_CALLBACK(doc_manager_change_document_cb), object);
+}
+
 /*
 * gphpedit_classbrowser_new
 * return a new classbrowser widget
 */
 GtkWidget *
-gphpedit_classbrowser_new (void)
+gphpedit_classbrowser_new (gpointer main_window)
 {
-  return g_object_new (GPHPEDIT_TYPE_CLASSBROWSER, NULL);
+  return g_object_new (GPHPEDIT_TYPE_CLASSBROWSER, "main_window", main_window, NULL);
 }
 
 /*
@@ -210,7 +265,7 @@ static gint on_parse_current_click (GtkWidget *widget, gpointer user_data)
 {
   gphpeditClassBrowserPrivate *priv = (gphpeditClassBrowserPrivate *) user_data;
   g_object_set (priv->prefmg, "parse_only_current_file", gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)), NULL);
-  sdb_update_cb (priv->symbolmg, priv);
+  sdb_update_cb (priv->main_window->symbolmg, priv);
   return 0;
 }
 
@@ -297,7 +352,7 @@ static void sdb_update_cb (SymbolManager *symbolmg, gpointer user_data)
   }
   classbrowser_clear_model (priv);
 
-  Documentable *doc = document_manager_get_current_documentable(priv->docmg);
+  Documentable *doc = document_manager_get_current_documentable(priv->main_window->docmg);
   guint doc_type;
   g_object_get(doc, "type", &doc_type, NULL);
 
@@ -322,9 +377,9 @@ static void sdb_update_cb (SymbolManager *symbolmg, gpointer user_data)
   priv->new_model = classbrowser_get_model(priv);
   gtk_tree_view_set_model (GTK_TREE_VIEW( priv->classtreeview), priv->new_model);
 
-  press_event = g_signal_connect(GTK_OBJECT(priv->classtreeview), "button_press_event",
+  press_event = g_signal_connect(priv->classtreeview, "button_press_event",
                                    G_CALLBACK(treeview_double_click), priv);
-  release_event = g_signal_connect(GTK_OBJECT(priv->classtreeview), "button_release_event",
+  release_event = g_signal_connect(priv->classtreeview, "button_release_event",
                                      G_CALLBACK(treeview_click_release), priv);
   priv->front=!priv->front; /* change model */
 }
@@ -463,7 +518,7 @@ static gint treeview_double_click(GtkWidget *widget, GdkEventButton *event, gpoi
       if (gtk_tree_selection_get_selected (priv->classtreeselect, NULL, &iter)) {
           gtk_tree_model_get (GTK_TREE_MODEL(priv->new_model), &iter, FILENAME_COLUMN, &filename, LINE_NUMBER_COLUMN, &line_number, -1);
         if (filename) {
-          document_manager_switch_to_file_or_open(priv->docmg, filename, line_number);
+          document_manager_switch_to_file_or_open(priv->main_window->docmg, filename, line_number);
           g_free (filename);
         }
       }
@@ -486,7 +541,7 @@ static gint treeview_click_release(GtkWidget *widget, GdkEventButton *event, gpo
     }
   }
   /* go to position */
-  documentable_scroll_to_current_pos(document_manager_get_current_documentable(priv->docmg));
+  documentable_scroll_to_current_pos(document_manager_get_current_documentable(priv->main_window->docmg));
  
   return FALSE;
 }
@@ -511,6 +566,7 @@ static void doc_manager_change_document_cb (DocumentManager *docmg, Documentable
   }
   classbrowser_update(user_data);
 }
+
 /*
 * classbrowser_update
 * start update process
@@ -526,8 +582,8 @@ void classbrowser_update(gphpeditClassBrowser *classbrowser)
   if (!gtk_tree_selection_get_selected (priv->classtreeselect, NULL, &iter)) {
       gtk_label_set_text(GTK_LABEL(priv->treeviewlabel), _("FILE:"));
   }
-  if (document_manager_get_document_count (priv->docmg)) {
-    sdb_update_cb (priv->symbolmg, priv);
+  if (document_manager_get_document_count (priv->main_window->docmg)) {
+    sdb_update_cb (priv->main_window->symbolmg, priv);
   }
 }
 

@@ -1048,24 +1048,24 @@ static void create_infobar(Document_Scintilla *doc) {
 
 static gboolean scintilla_key_press (GtkWidget *widget, GdkEventKey *event, gpointer user_data) 
 {
-  if ((event->state & GDK_CONTROL_MASK)==GDK_CONTROL_MASK && ((event->keyval == GDK_F2)))  {
+  if ((event->state & GDK_CONTROL_MASK)==GDK_CONTROL_MASK && ((event->keyval == GDK_KEY_F2)))  {
     document_scintilla_modify_current_line_marker(user_data);
     return TRUE;
   }
-  else if ((event->keyval == GDK_F2))  {
+  else if ((event->keyval == GDK_KEY_F2))  {
       document_scintilla_find_next_marker(user_data);
       return TRUE;
   }  
-  else if (((event->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK))==(GDK_CONTROL_MASK | GDK_SHIFT_MASK)) && (event->keyval == GDK_space)) {
+  else if (((event->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK))==(GDK_CONTROL_MASK | GDK_SHIFT_MASK)) && (event->keyval == GDK_KEY_space)) {
     document_scintilla_show_calltip_at_current_pos(user_data);
     return TRUE;
   }
-  else if ((event->state & GDK_CONTROL_MASK)==GDK_CONTROL_MASK && ((event->keyval == GDK_j) || (event->keyval == GDK_J)))  {
+  else if ((event->state & GDK_CONTROL_MASK)==GDK_CONTROL_MASK && ((event->keyval == GDK_KEY_j) || (event->keyval == GDK_KEY_J)))  {
     Document_ScintillaDetails *docdet = DOCUMENT_SCINTILLA_GET_PRIVATE(user_data);
     template_find_and_insert(docdet->tempmg, user_data);
     return TRUE;
   }
-  else if ((event->state & GDK_CONTROL_MASK)==GDK_CONTROL_MASK && (event->keyval == GDK_space)) { 
+  else if ((event->state & GDK_CONTROL_MASK)==GDK_CONTROL_MASK && (event->keyval == GDK_KEY_space)) { 
     document_scintilla_force_autocomplete(user_data);
     return TRUE;
   }
@@ -1153,7 +1153,6 @@ static void document_scintilla_constructed (GObject *object)
   g_object_set(object, "short_filename", short_filename, NULL);
   gtk_label_set_text(GTK_LABEL(docdet->label), short_filename);
   gtk_widget_show (docdet->label);
-
 }
 
 Document_Scintilla *document_scintilla_new (gint type, GFile *file, gint goto_line, gchar *contents)
@@ -1765,9 +1764,6 @@ static void document_scintilla_saver_done_saving_cb (DocumentSaver *docsav, Docu
   if (type==TAB_FILE) {
     document_scintilla_auto_detect_file_type(DOCUMENTABLE(doc));
   }
-  gchar *filename = documentable_get_filename(DOCUMENTABLE(doc));
-  register_file_opened(filename);
-  g_free(filename);
 }
 
 static char *macro_message_to_string(gint message)

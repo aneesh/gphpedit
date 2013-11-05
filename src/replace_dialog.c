@@ -31,7 +31,7 @@
 
 #include "main_window.h"
 #include "gphpedit-statusbar.h"
-#include "history-entry.h"
+#include "gedit-history-entry.h"
 
 #include "replace_dialog.h"
 
@@ -41,6 +41,8 @@
 
 struct _ReplaceDialogPrivate 
 {
+  MainWindow *main_window;
+
   GtkWidget *diagbox;
   GtkWidget *findentry;
   GtkWidget *replace_entry;
@@ -54,7 +56,53 @@ struct _ReplaceDialogPrivate
   GtkWidget *replaceall_button;
 };
 
+static void replace_dialog_constructed (GObject *object);
+
 G_DEFINE_TYPE(ReplaceDialog, REPLACE_DIALOG, GTK_TYPE_DIALOG)
+
+enum
+{
+  PROP_0,
+  PROP_MAIN_WINDOW
+};
+
+static void
+replace_dialog_set_property (GObject      *object,
+			      guint         prop_id,
+			      const GValue *value,
+			      GParamSpec   *pspec)
+{
+  ReplaceDialogPrivate *priv = REPLACE_DIALOG_GET_PRIVATE(object);
+
+  switch (prop_id)
+  {
+    case PROP_MAIN_WINDOW:
+        priv->main_window = g_value_get_pointer(value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+static void
+replace_dialog_get_property (GObject    *object,
+			      guint       prop_id,
+			      GValue     *value,
+			      GParamSpec *pspec)
+{
+  ReplaceDialogPrivate *priv = REPLACE_DIALOG_GET_PRIVATE(object);
+  
+  switch (prop_id)
+  {
+    case PROP_MAIN_WINDOW:
+      g_value_set_pointer (value, priv->main_window);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+    }
+}
 
 static void
 REPLACE_DIALOG_class_init (ReplaceDialogClass *klass)
@@ -62,6 +110,15 @@ REPLACE_DIALOG_class_init (ReplaceDialogClass *klass)
 	GObjectClass *object_class;
 
 	object_class = G_OBJECT_CLASS (klass);
+    object_class->set_property = replace_dialog_set_property;
+    object_class->get_property = replace_dialog_get_property;
+    object_class->constructed = replace_dialog_constructed;
+
+    g_object_class_install_property (object_class,
+                              PROP_MAIN_WINDOW,
+                              g_param_spec_pointer ("main_window",
+                              NULL, NULL,
+                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
 
 	g_type_class_add_private (klass, sizeof (ReplaceDialogPrivate));
 }
@@ -71,12 +128,12 @@ void replace_all_clicked(ReplaceDialogPrivate *priv)
   GString *message;
   const gchar *text;
   const gchar *replace;
-  Documentable *doc = document_manager_get_current_documentable(main_window.docmg);
+  Documentable *doc = document_manager_get_current_documentable(priv->main_window->docmg);
 
-  text = gtk_combo_box_get_active_text (GTK_COMBO_BOX(priv->findentry));
-  gphpedit_history_entry_prepend_text	(GPHPEDIT_HISTORY_ENTRY(priv->findentry), text);
-  replace = gtk_combo_box_get_active_text (GTK_COMBO_BOX(priv->replace_entry));
-  gphpedit_history_entry_prepend_text	(GPHPEDIT_HISTORY_ENTRY(priv->replace_entry), text);
+  text = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(priv->findentry));
+  gedit_history_entry_prepend_text	(GEDIT_HISTORY_ENTRY(priv->findentry), text);
+  replace = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(priv->replace_entry));
+  gedit_history_entry_prepend_text	(GEDIT_HISTORY_ENTRY(priv->replace_entry), text);
 
   gboolean checkwholedoc = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON(priv->checkwholedoc));
   if (checkwholedoc) {
@@ -101,7 +158,7 @@ void replace_all_clicked(ReplaceDialogPrivate *priv)
     g_string_printf(message, _("\"%d\" occurences of \"%s\" found, all replaced."), numfound, text);
   }
 
-  gphpedit_statusbar_flash_message (GPHPEDIT_STATUSBAR(main_window.appbar), 0,"%s",message->str);
+  gphpedit_statusbar_flash_message (GPHPEDIT_STATUSBAR(priv->main_window->appbar), 0,"%s",message->str);
   documentable_goto_pos(doc, documentable_get_current_position(doc));
 }
 
@@ -110,12 +167,12 @@ void replace_clicked(GtkDialog *dialog, ReplaceDialogPrivate *priv)
   GString *message;
   const gchar *text;
   const gchar *replace;
-  Documentable *doc = document_manager_get_current_documentable(main_window.docmg);
+  Documentable *doc = document_manager_get_current_documentable(priv->main_window->docmg);
 
-  text = gtk_combo_box_get_active_text (GTK_COMBO_BOX(priv->findentry));
-  gphpedit_history_entry_prepend_text	(GPHPEDIT_HISTORY_ENTRY(priv->findentry), text);
-  replace = gtk_combo_box_get_active_text (GTK_COMBO_BOX(priv->replace_entry));
-  gphpedit_history_entry_prepend_text	(GPHPEDIT_HISTORY_ENTRY(priv->replace_entry), text);
+  text = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(priv->findentry));
+  gedit_history_entry_prepend_text	(GEDIT_HISTORY_ENTRY(priv->findentry), text);
+  replace = gtk_combo_box_text_get_active_text (GTK_COMBO_BOX_TEXT(priv->replace_entry));
+  gedit_history_entry_prepend_text	(GEDIT_HISTORY_ENTRY(priv->replace_entry), text);
 
   gboolean checkwholedoc = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON(priv->checkwholedoc));
   if (checkwholedoc) {
@@ -133,7 +190,7 @@ void replace_clicked(GtkDialog *dialog, ReplaceDialogPrivate *priv)
   if (numfound==0) {
     message = g_string_new("");
     g_string_printf(message, _("\"%s\" not found, no replacements made."), text);
-    gphpedit_statusbar_flash_message (GPHPEDIT_STATUSBAR(main_window.appbar), 0, "%s",message->str);
+    gphpedit_statusbar_flash_message (GPHPEDIT_STATUSBAR(priv->main_window->appbar), 0, "%s",message->str);
   }
   documentable_goto_pos(doc, documentable_get_current_position(doc));
 }
@@ -172,21 +229,12 @@ REPLACE_DIALOG_init (ReplaceDialog *dialog)
   GtkWidget *table = GTK_WIDGET(gtk_builder_get_object (builder, "table"));
   gtk_table_set_row_spacings (GTK_TABLE (table), 12);
 
-  priv->findentry = gphpedit_history_entry_new ("search-for-entry", TRUE);
+  priv->findentry = gedit_history_entry_new ("search-for-entry", TRUE);
 	gtk_widget_set_size_request (priv->findentry, 200, -1);
   gtk_widget_show (priv->findentry);
   gtk_table_attach_defaults (GTK_TABLE (table), priv->findentry, 1, 2, 0, 1);
-  
-  /* Get selected text */
-  gchar *buffer;
-  buffer = documentable_get_current_selected_text(document_manager_get_current_documentable(main_window.docmg));
-  if (buffer) {
-      gphpedit_history_entry_prepend_text	(GPHPEDIT_HISTORY_ENTRY(priv->findentry), buffer);
-      gtk_combo_box_set_active (GTK_COMBO_BOX(priv->findentry), 0);
-  }
-  /* End get selected text */
 
-  priv->replace_entry = gphpedit_history_entry_new ("replace-with-entry", TRUE);
+  priv->replace_entry = gedit_history_entry_new ("replace-with-entry", TRUE);
 	gtk_widget_set_size_request (priv->replace_entry, 200, -1);
   gtk_widget_show (priv->replace_entry);
   gtk_table_attach_defaults (GTK_TABLE (table), priv->replace_entry, 1, 2, 1, 2);
@@ -201,16 +249,36 @@ REPLACE_DIALOG_init (ReplaceDialog *dialog)
   priv->find_button = gtk_dialog_add_button (GTK_DIALOG(dialog),  GTK_STOCK_FIND_AND_REPLACE, GTK_RESPONSE_OK);
   
   gtk_dialog_set_default_response (GTK_DIALOG(dialog), GTK_RESPONSE_OK);
+}
 
-  g_signal_connect(G_OBJECT(dialog), "response", G_CALLBACK(replace_dialog_process_response), priv);
+static void replace_dialog_constructed (GObject *object)
+{
+    ReplaceDialogPrivate *priv = REPLACE_DIALOG_GET_PRIVATE(object);
+
+    /* Get selected text */
+    gchar *buffer;
+    Documentable *doc = document_manager_get_current_documentable(priv->main_window->docmg);
+    buffer = documentable_get_current_selected_text(doc);
+    if (buffer) {
+        gedit_history_entry_prepend_text (GEDIT_HISTORY_ENTRY(priv->findentry), buffer);
+        gtk_combo_box_set_active (GTK_COMBO_BOX(priv->findentry), 0);
+    }
+    /* End get selected text */
+
+    gtk_window_set_position (GTK_WINDOW(object), GTK_WIN_POS_CENTER);
+    gtk_window_set_title (GTK_WINDOW (object), _("Find"));
+    gtk_window_set_resizable (GTK_WINDOW (object), FALSE);
+    gtk_container_set_border_width (GTK_CONTAINER (object), 10);
+
+    g_signal_connect(object, "response", G_CALLBACK(replace_dialog_process_response), priv);
 }
 
 GtkWidget *
-replace_dialog_new (GtkWindow *parent)
+replace_dialog_new (GtkWindow *parent, gpointer main_window)
 {
 	ReplaceDialog *dialog;
 
-	dialog = g_object_new (GOBJECT_TYPE_REPLACE_DIALOG, "has-separator", FALSE, NULL);
+	dialog = g_object_new (GOBJECT_TYPE_REPLACE_DIALOG, "main_window", main_window, NULL);
 
 	if (parent != NULL)
 	{
@@ -221,11 +289,6 @@ replace_dialog_new (GtkWindow *parent)
 						    TRUE);
 	}
 
-  gtk_window_set_position (GTK_WINDOW(dialog), GTK_WIN_POS_CENTER);
-  gtk_window_set_title (GTK_WINDOW (dialog), _("Replace"));
-  gtk_window_set_resizable (GTK_WINDOW (dialog), FALSE);
-  gtk_container_set_border_width (GTK_CONTAINER (dialog), 10);
-
-	return GTK_WIDGET (dialog);
+    return GTK_WIDGET (dialog);
 }
 

@@ -1,8 +1,8 @@
-/* This file is part of gPHPEdit, a GNOME2 PHP Editor.
+/* This file is part of gPHPEdit, a GNOME PHP Editor.
 
    Copyright (C) 2003, 2004, 2005 Andy Jeffries <andy at gphpedit.org>
    Copyright (C) 2009 Anoop John <anoop dot john at zyxware.com>
-   Copyright (C) 2009, 2010 José Rostagno (for vijona.com.ar) 
+   Copyright (C) 2009, 2010, 2011 José Rostagno (for vijona.com.ar) 
 
    For more information or to find the latest release, visit our 
    website at http://www.gphpedit.org/
@@ -50,7 +50,7 @@ typedef struct
 
 typedef struct
 {
-	GObjectClass parent_class;
+  GObjectClass parent_class;
 
   void (* new_document) (DocumentManager *docmg, Documentable *doc, gpointer user_data);
 
@@ -59,7 +59,7 @@ typedef struct
 /* Basic GObject requirements. */
 GType document_manager_get_type (void);
 DocumentManager *document_manager_new (void);
-DocumentManager *document_manager_new_full (char **argv, gint argc);
+DocumentManager *document_manager_new_full (char **argv, gint argc, gpointer main_window);
 void document_manager_add_new_document(DocumentManager *docmg, gint type, const gchar *filename, gint goto_line);
 void document_manager_document_reload(DocumentManager *docmg);
 Documentable *document_manager_find_documentable_from_filename (DocumentManager *docmg, gchar *filename);
